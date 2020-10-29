@@ -15,8 +15,16 @@ library(DEGreport)
 library(pheatmap)
 library(tidyr)
 library(clusterProfiler)
+library(enrichplot)
+library(ggupset)
 library(org.Mm.eg.db)
 library(tidyverse)
+library(DOSE)
+library(pathview)
+library(SPIA)
+
+
+install.packages("ggupset")
 update.packages()
 
 # For creating Tx2gene file
@@ -282,7 +290,6 @@ sig_res_dds_LRT_1hr_MGonly_Txt <- merge(sig_res_dds_LRT_1hr_MGonly, grch99annot,
 sig_res_dds_LRT_2hrs_MGonly <- res_dds_LRT_2hrs_MGonly_tb %>%  filter(padj < padj.cutoff & abs(log2FoldChange) > 0.58)
 
 sig_res_dds_LRT_2hrs_MGonly_Txt <- merge(sig_res_dds_LRT_2hrs_MGonly, grch99annot, by.x="gene", by.y="gene_id")
-
 
 nrow(sig_res_dds_LRT_30min_MGonly)
 nrow(sig_res_dds_LRT_1hr_MGonly)
@@ -887,7 +894,7 @@ pheatmap(go_all_four_MG1hr[c(2:4, 8:10)],          color = colorRampPalette(rev(
          annotation = (metaanno),
          annotation_names_row = F,
          annotation_colors = ann_colorsMG1hr,
-         legend_breaks = c(-2,0,2),
+         legend_breaks = c(-1.5,0,1.5),
          border_color = NA, 
          fontsize = 10, 
          scale = "row", 
@@ -1033,4 +1040,272 @@ pheatmap(cell_specific[c(2:4, 14:16)],
          scale = "row", 
          fontsize_row = 10, 
          height = 20)
+
+#------------KEGG GSEA and SPIA
+
+#---For MG 30min
+
+res_dds_LRT_30min_MGonly_tb_entrez <- merge(res_dds_LRT_30min_MGonly_tb, annotations[, c("gene_id", "entrezid")], by.x="gene", by.y="gene_id") %>% as_tibble()
+
+
+res_dds_LRT_30min_MGonly_tb_entrez  <- filter(res_dds_LRT_30min_MGonly_tb_entrez, entrezid != "NA")
+
+res_dds_LRT_30min_MGonly_tb_entrez <- res_dds_LRT_30min_MGonly_tb_entrez[which(duplicated(res_dds_LRT_30min_MGonly_tb_entrez$entrezid) == F), ]
+
+foldchanges_res_dds_LRT_30min_MGonly <- res_dds_LRT_30min_MGonly_tb_entrez$log2FoldChange
+
+names(foldchanges_res_dds_LRT_30min_MGonly) <- res_dds_LRT_30min_MGonly_tb_entrez$entrezid
+
+foldchanges_res_dds_LRT_30min_MGonly <- sort(foldchanges_res_dds_LRT_30min_MGonly, decreasing = TRUE)
+
+
+sig_30min_MGonly_entrezid <- dplyr::filter(res_dds_LRT_30min_MGonly_tb_entrez, padj < 0.05 & abs(log2FoldChange) > 0.58)
+
+sig_30min_MGonly_entrezid <<-dplyr::filter(sig_30min_MGonly_entrezid, entrezid != "NA")
+
+entrezid_sig_30min_MGonly_entrezid <- as.character(sig_30min_MGonly_entrezid$entrezid)
+
+kk_30min_MGonly <- enrichKEGG(gene = entrezid_sig_30min_MGonly_entrezid, universe=names(foldchanges_res_dds_LRT_30min_MGonly), organism = 'mmu', pvalueCutoff = 0.05, qvalueCutoff = 0.01, keyType =  "ncbi-geneid")
+
+
+enrichKEGG_kk_30min_MGonly <- data.frame(kk_30min_MGonly)
+
+write.csv(enrichKEGG_kk_30min_MGonly, "data/enrichKEGG_kk_30min_MGonly.csv")
+
+dotplot(kk_30min_MGonly, 
+        showCategory = 10, 
+        title = "Enriched Pathways in Microglia at LPS 30min",
+        font.size = 8)
+
+
+sig_foldchanges_30min_MGonly_entrezid <- sig_30min_MGonly_entrezid$log2FoldChange
+
+names(sig_foldchanges_30min_MGonly_entrezid) <- sig_30min_MGonly_entrezid$entrezid
+
+spia_30min_MGonly <- spia(de=sig_foldchanges_30min_MGonly_entrezid, all = names(foldchanges_res_dds_LRT_30min_MGonly), organism = "mmu", nB=3000, plots = TRUE)
+
+view(spia_30min_MGonly)
+
+
+
+#---For MG 1hr
+
+res_dds_LRT_1hr_MGonly_tb_entrez <- merge(res_dds_LRT_1hr_MGonly_tb, annotations[, c("gene_id", "entrezid")], by.x="gene", by.y="gene_id") %>% as.tibble()
+
+
+res_dds_LRT_1hr_MGonly_tb_entrez  <- filter(res_dds_LRT_1hr_MGonly_tb_entrez, entrezid != "NA")
+
+res_dds_LRT_1hr_MGonly_tb_entrez <- res_dds_LRT_1hr_MGonly_tb_entrez[which(duplicated(res_dds_LRT_1hr_MGonly_tb_entrez$entrezid) == F), ]
+
+foldchanges_res_dds_LRT_1hr_MGonly <- res_dds_LRT_1hr_MGonly_tb_entrez$log2FoldChange
+
+names(foldchanges_res_dds_LRT_1hr_MGonly) <- res_dds_LRT_1hr_MGonly_tb_entrez$entrezid
+
+foldchanges_res_dds_LRT_1hr_MGonly <- sort(foldchanges_res_dds_LRT_1hr_MGonly, decreasing = TRUE)
+
+
+sig_1hr_MGonly_entrezid <- dplyr::filter(res_dds_LRT_1hr_MGonly_tb_entrez, padj < 0.05 & abs(log2FoldChange) > 0.58)
+
+sig_1hr_MGonly_entrezid <<-dplyr::filter(sig_1hr_MGonly_entrezid, entrezid != "NA")
+
+entrezid_sig_1hr_MGonly_entrezid <- as.character(sig_1hr_MGonly_entrezid$entrezid)
+
+kk_1hr_MGonly <- enrichKEGG(gene = entrezid_sig_1hr_MGonly_entrezid, universe=names(foldchanges_res_dds_LRT_1hr_MGonly), organism = 'mmu', pvalueCutoff = 0.05, qvalueCutoff = 0.01, keyType =  "ncbi-geneid")
+
+enrichKEGG_kk_1hr_MGonly <- data.frame(kk_1hr_MGonly)
+
+write.csv(enrichKEGG_kk_1hr_MGonly, "data/enrichKEGG_kk_1hr_MGonly.csv")
+
+dotplot(kk_1hr_MGonly, 
+        showCategory = 10, 
+        title = "Enriched Pathways in Microglia at LPS 1hr",
+        font.size = 8)
+
+
+sig_foldchanges_1hr_MGonly_entrezid <- sig_1hr_MGonly_entrezid$log2FoldChange
+
+names(sig_foldchanges_1hr_MGonly_entrezid) <- sig_1hr_MGonly_entrezid$entrezid
+
+spia_1hr_MGonly <- spia(de=sig_foldchanges_1hr_MGonly_entrezid, all = names(foldchanges_res_dds_LRT_1hr_MGonly), organism = "mmu", nB=3000, plots = TRUE)
+
+view(spia_1hr_MGonly)
+
+
+
+#---For MG 2hrs
+
+res_dds_LRT_2hrs_MGonly_tb_entrez <- merge(res_dds_LRT_2hrs_MGonly_tb, annotations[, c("gene_id", "entrezid")], by.x="gene", by.y="gene_id") %>% as.tibble()
+
+
+res_dds_LRT_2hrs_MGonly_tb_entrez  <- filter(res_dds_LRT_2hrs_MGonly_tb_entrez, entrezid != "NA")
+
+res_dds_LRT_2hrs_MGonly_tb_entrez <- res_dds_LRT_2hrs_MGonly_tb_entrez[which(duplicated(res_dds_LRT_2hrs_MGonly_tb_entrez$entrezid) == F), ]
+
+foldchanges_res_dds_LRT_2hrs_MGonly <- res_dds_LRT_2hrs_MGonly_tb_entrez$log2FoldChange
+
+names(foldchanges_res_dds_LRT_2hrs_MGonly) <- res_dds_LRT_2hrs_MGonly_tb_entrez$entrezid
+
+foldchanges_res_dds_LRT_2hrs_MGonly <- sort(foldchanges_res_dds_LRT_2hrs_MGonly, decreasing = TRUE)
+
+
+sig_2hrs_MGonly_entrezid <- dplyr::filter(res_dds_LRT_2hrs_MGonly_tb_entrez, padj < 0.05 & abs(log2FoldChange) > 0.58)
+
+sig_2hrs_MGonly_entrezid <<-dplyr::filter(sig_2hrs_MGonly_entrezid, entrezid != "NA")
+
+entrezid_sig_2hrs_MGonly_entrezid <- as.character(sig_2hrs_MGonly_entrezid$entrezid)
+
+kk_2hrs_MGonly <- enrichKEGG(gene = entrezid_sig_2hrs_MGonly_entrezid, universe=names(foldchanges_res_dds_LRT_2hrs_MGonly), organism = 'mmu', pvalueCutoff = 0.05, qvalueCutoff = 0.01, keyType =  "ncbi-geneid")
+
+enrichKEGG_kk_2hrs_MGonly <- data.frame(kk_2hrs_MGonly)
+
+write.csv(enrichKEGG_kk_2hrs_MGonly, "data/enrichKEGG_kk_2hrs_MGonly.csv")
+
+dotplot(kk_2hrs_MGonly, 
+        showCategory = 10, 
+        title = "Enriched Pathways in Microglia at LPS 2hrs",
+        font.size = 8)
+
+
+sig_foldchanges_2hrs_MGonly_entrezid <- sig_2hrs_MGonly_entrezid$log2FoldChange
+
+names(sig_foldchanges_2hrs_MGonly_entrezid) <- sig_2hrs_MGonly_entrezid$entrezid
+
+spia_2hrs_MGonly <- spia(de=sig_foldchanges_2hrs_MGonly_entrezid, all = names(foldchanges_res_dds_LRT_2hrs_MGonly), organism = "mmu", nB=3000, plots = TRUE)
+
+view(spia_2hrs_MGonly)
+
+subset(spia_2hrs_MGonly, ID == "04064")
+
+
+#---For EC 30min
+
+res_dds_LRT_30min_EConly_tb_entrez <- merge(res_dds_LRT_30min_EConly_tb, annotations[, c("gene_id", "entrezid")], by.x="gene", by.y="gene_id") %>% as.tibble()
+
+
+res_dds_LRT_30min_EConly_tb_entrez  <- filter(res_dds_LRT_30min_EConly_tb_entrez, entrezid != "NA")
+
+res_dds_LRT_30min_EConly_tb_entrez <- res_dds_LRT_30min_EConly_tb_entrez[which(duplicated(res_dds_LRT_30min_EConly_tb_entrez$entrezid) == F), ]
+
+foldchanges_res_dds_LRT_30min_EConly <- res_dds_LRT_30min_EConly_tb_entrez$log2FoldChange
+
+names(foldchanges_res_dds_LRT_30min_EConly) <- res_dds_LRT_30min_EConly_tb_entrez$entrezid
+
+foldchanges_res_dds_LRT_30min_EConly <- sort(foldchanges_res_dds_LRT_30min_EConly, decreasing = TRUE)
+
+
+sig_30min_EConly_entrezid <- dplyr::filter(res_dds_LRT_30min_EConly_tb_entrez, padj < 0.05 & abs(log2FoldChange) > 0.58)
+
+sig_30min_EConly_entrezid <<-dplyr::filter(sig_30min_EConly_entrezid, entrezid != "NA")
+
+entrezid_sig_30min_EConly_entrezid <- as.character(sig_30min_EConly_entrezid$entrezid)
+
+kk_30min_EConly <- enrichKEGG(gene = entrezid_sig_30min_EConly_entrezid, universe=names(foldchanges_res_dds_LRT_30min_EConly), organism = 'mmu', pvalueCutoff = 0.05, qvalueCutoff = 0.01, keyType =  "ncbi-geneid")
+
+enrichKEGG_kk_30min_EConly <- data.frame(kk_30min_EConly)
+
+write.csv(enrichKEGG_kk_30min_EConly, "data/enrichKEGG_kk_30min_EConly.csv")
+
+dotplot(kk_30min_EConly, 
+        showCategory = 10, 
+        title = "Enriched Pathways in CECs at LPS 30min",
+        font.size = 8)
+
+
+
+sig_foldchanges_30min_EConly_entrezid <- sig_30min_EConly_entrezid$log2FoldChange
+
+names(sig_foldchanges_30min_EConly_entrezid) <- sig_30min_EConly_entrezid$entrezid
+
+spia_30min_EConly <- spia(de=sig_foldchanges_30min_EConly_entrezid, all = names(foldchanges_res_dds_LRT_30min_EConly), organism = "mmu", nB=3000, plots = TRUE)
+
+view(spia_30min_EConly)
+
+pathview(gene.data = foldchanges_res_dds_LRT_30min_EConly, pathway.id = "mmu04064", species = "mmu", limit = list(gene = 1.58))
+
+
+#---For CEC 1hr
+
+res_dds_LRT_1hr_EConly_tb_entrez <- merge(res_dds_LRT_1hr_EConly_tb, annotations[, c("gene_id", "entrezid")], by.x="gene", by.y="gene_id") %>% as.tibble()
+
+
+res_dds_LRT_1hr_EConly_tb_entrez  <- filter(res_dds_LRT_1hr_EConly_tb_entrez, entrezid != "NA")
+
+res_dds_LRT_1hr_EConly_tb_entrez <- res_dds_LRT_1hr_EConly_tb_entrez[which(duplicated(res_dds_LRT_1hr_EConly_tb_entrez$entrezid) == F), ]
+
+foldchanges_res_dds_LRT_1hr_EConly <- res_dds_LRT_1hr_EConly_tb_entrez$log2FoldChange
+
+names(foldchanges_res_dds_LRT_1hr_EConly) <- res_dds_LRT_1hr_EConly_tb_entrez$entrezid
+
+foldchanges_res_dds_LRT_1hr_EConly <- sort(foldchanges_res_dds_LRT_1hr_EConly, decreasing = TRUE)
+
+
+sig_1hr_EConly_entrezid <- dplyr::filter(res_dds_LRT_1hr_EConly_tb_entrez, padj < 0.05 & abs(log2FoldChange) > 0.58)
+
+sig_1hr_EConly_entrezid <<-dplyr::filter(sig_1hr_EConly_entrezid, entrezid != "NA")
+
+entrezid_sig_1hr_EConly_entrezid <- as.character(sig_1hr_EConly_entrezid$entrezid)
+
+kk_1hr_EConly <- enrichKEGG(gene = entrezid_sig_1hr_EConly_entrezid, universe=names(foldchanges_res_dds_LRT_1hr_EConly), organism = 'mmu', pvalueCutoff = 0.05, qvalueCutoff = 0.01, keyType =  "ncbi-geneid")
+
+enrichKEGG_kk_1hr_EConly <- data.frame(kk_1hr_EConly)
+
+write.csv(enrichKEGG_kk_1hr_EConly, "data/enrichKEGG_kk_1hr_EConly.csv")
+
+dotplot(kk_1hr_EConly, 
+        showCategory = 10, 
+        title = "Enriched Pathways in CECs at LPS 1hr",
+        font.size = 8)
+
+sig_foldchanges_1hr_EConly_entrezid <- sig_1hr_EConly_entrezid$log2FoldChange
+
+names(sig_foldchanges_1hr_EConly_entrezid) <- sig_1hr_EConly_entrezid$entrezid
+
+spia_1hr_EConly <- spia(de=sig_foldchanges_1hr_EConly_entrezid, all = names(foldchanges_res_dds_LRT_1hr_EConly), organism = "mmu", nB=3000, plots = TRUE)
+
+view(spia_1hr_EConly)
+
+
+
+#---For MG 2hrs
+
+res_dds_LRT_2hrs_EConly_tb_entrez <- merge(res_dds_LRT_2hrs_EConly_tb, annotations[, c("gene_id", "entrezid")], by.x="gene", by.y="gene_id") %>% as.tibble()
+
+
+res_dds_LRT_2hrs_EConly_tb_entrez  <- filter(res_dds_LRT_2hrs_EConly_tb_entrez, entrezid != "NA")
+
+res_dds_LRT_2hrs_EConly_tb_entrez <- res_dds_LRT_2hrs_EConly_tb_entrez[which(duplicated(res_dds_LRT_2hrs_EConly_tb_entrez$entrezid) == F), ]
+
+foldchanges_res_dds_LRT_2hrs_EConly <- res_dds_LRT_2hrs_EConly_tb_entrez$log2FoldChange
+
+names(foldchanges_res_dds_LRT_2hrs_EConly) <- res_dds_LRT_2hrs_EConly_tb_entrez$entrezid
+
+foldchanges_res_dds_LRT_2hrs_EConly <- sort(foldchanges_res_dds_LRT_2hrs_EConly, decreasing = TRUE)
+
+
+sig_2hrs_EConly_entrezid <- dplyr::filter(res_dds_LRT_2hrs_EConly_tb_entrez, padj < 0.05 & abs(log2FoldChange) > 0.58)
+
+sig_2hrs_EConly_entrezid <<-dplyr::filter(sig_2hrs_EConly_entrezid, entrezid != "NA")
+
+entrezid_sig_2hrs_EConly_entrezid <- as.character(sig_2hrs_EConly_entrezid$entrezid)
+
+kk_2hrs_EConly <- enrichKEGG(gene = entrezid_sig_2hrs_EConly_entrezid, universe=names(foldchanges_res_dds_LRT_2hrs_EConly), organism = 'mmu', pvalueCutoff = 0.05, qvalueCutoff = 0.01, keyType =  "ncbi-geneid")
+
+enrichKEGG_kk_2hrs_EConly <- data.frame(kk_2hrs_EConly)
+
+write.csv(enrichKEGG_kk_2hrs_EConly, "data/enrichKEGG_kk_2hrs_EConly.csv")
+
+dotplot(kk_2hrs_EConly, 
+        showCategory = 10, 
+        title = "Enriched Pathways in CECs at LPS 2hrs",
+        font.size = 8)
+
+
+sig_foldchanges_2hrs_EConly_entrezid <- sig_2hrs_EConly_entrezid$log2FoldChange
+
+names(sig_foldchanges_2hrs_EConly_entrezid) <- sig_2hrs_EConly_entrezid$entrezid
+
+spia_2hrs_EConly <- spia(de=sig_foldchanges_2hrs_EConly_entrezid, all = names(foldchanges_res_dds_LRT_2hrs_EConly), organism = "mmu", nB=3000, plots = TRUE)
+
+view(spia_2hrs_EConly)
+
 
