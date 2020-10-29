@@ -24,8 +24,6 @@ library(pathview)
 library(SPIA)
 
 
-install.packages("ggupset")
-update.packages()
 
 # For creating Tx2gene file
 
